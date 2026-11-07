@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite databases (uncomment if you do not want to commit the local database)
+# data/*.db
+# data/*.sqlite3
+
+# Environments
+.venv/
+venv/
+ENV/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python test cache
+.pytest_cache/
+
+# Backup files
+data/backup/
+
+# OS files
+.DS_Store
+Thumbs.db

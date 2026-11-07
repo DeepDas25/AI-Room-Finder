@@ -1,0 +1,37 @@
+room_code,building,room_type,is_regular_classroom,is_alternate_venue,total_scheduled_slots,source_files
+AIC-004,Atal Incubation Centre (AIC),Seminar Room,False,True,3,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB-006 (IET),Engineering Block (EB),Classroom,False,True,3,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB1-002,Engineering Block 1 (EB-1),Lecture Hall / Classroom,True,False,18,Time Table 3rd sem.pdf
+EB1-101,Engineering Block 1 (EB-1),Lecture Hall / Classroom,True,False,22,Time Table 1st Sem.pdf
+EB1-102,Engineering Block 1 (EB-1),Lecture Hall / Classroom,True,False,21,Time Table 1st Sem.pdf
+EB1-103,Engineering Block 1 (EB-1),Lecture Hall / Classroom,True,False,23,Time Table 1st Sem.pdf
+EB1-104,Engineering Block 1 (EB-1),Lecture Hall / Classroom,True,False,21,Time Table 1st Sem.pdf
+EB2-001,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,14,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB2-004,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,21,Time Table 3rd sem.pdf
+EB2-005,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,12,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB2-006,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,14,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB2-101,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,23,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB2-102,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,25,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+EB2-104,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,18,Time Table 1st Sem.pdf
+EB2-105,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,26,Time Table 1st Sem.pdf
+EB2-106,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,29,Time Table 1st Sem.pdf
+EB2-202,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,27,Time Table 1st Sem.pdf
+EB2-204,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,26,Time Table 1st Sem.pdf
+EB2-205,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,26,Time Table 1st Sem.pdf
+EB2-206,Engineering Block 2 (EB-2),Lecture Hall / Classroom,True,False,22,Time Table 3rd sem.pdf
+IET Amphi / IM Amphi,Campus Amphitheatres,Open Amphitheatre / Auditorium,False,True,2,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+IET Amphitheatre,Campus Amphitheatres,Open Amphitheatre / Auditorium,False,True,18,Time Table 3rd sem.pdf
+IM-102,Management Block (IM),Management Classroom / Lab,False,True,5,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+IM-106,Management Block (IM),Management Classroom / Lab,True,True,29,Time_Table_Final IM V.4 from 3-Aug-26.pdf
+LRC002,Learning Resource Centre (LRC),High-Performance Computing Lab,False,True,4,Time Table 3rd sem.pdf
+LRC007,Learning Resource Centre (LRC),High-Performance Computing Lab,False,True,16,Time Table 3rd sem.pdf
+TB-102,Technology Block (TB),Computer / Hardware Lab,False,True,2,Time Table 3rd sem.pdf
+TB-102/108,Technology Block (TB),Computer / Hardware Lab,False,True,26,Time Table 1st Sem.pdf
+TB-102/112,Technology Block (TB),Computer / Hardware Lab,False,True,13,Time Table 1st Sem.pdf
+TB-104,Technology Block (TB),Classroom,True,False,21,Time Table 3rd sem.pdf
+TB-105,Technology Block (TB),Computer / Hardware Lab,False,True,12,Time Table 3rd sem.pdf
+TB-106,Technology Block (TB),Computer / Hardware Lab,False,True,30,"Time Table 1st Sem.pdf, Time Table 3rd sem.pdf"
+TB-107,Technology Block (TB),Classroom,True,False,19,Time Table 3rd sem.pdf
+TB-109,Technology Block (TB),Classroom,True,False,19,Time Table 3rd sem.pdf
+TB-112,Technology Block (TB),Computer / Hardware Lab,False,True,2,Time Table 3rd sem.pdf
+Unspecified / TBD,Unassigned,TBD / Visiting Faculty,True,False,2,Time_Table_Final IM V.4 from 3-Aug-26.pdf
