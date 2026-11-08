@@ -31,15 +31,42 @@ class TestCSPSolver(unittest.TestCase):
         self.vrooms = self.solver._get_valid_physical_rooms()
 
     def test_valid_physical_rooms_count(self):
-        """Only physical rooms with complete metadata (34 rooms) are loaded."""
+        """Only physical rooms with complete metadata (35 rooms) are loaded,
+        including canonical TB-109 and strictly excluding spaced alias TB- 109.
+        """
         self.assertEqual(
-            len(self.vrooms), 34,
-            "Exactly 34 physical rooms with complete metadata should be loaded."
+            len(self.vrooms), 35,
+            "Exactly 35 physical rooms with complete metadata should be loaded."
         )
-        # Verify invalid codes and unapproved strings are excluded
-        invalid_codes = ["EB1-1", "EB1-2", "EB2-2", "EB2-4", "TB-109", "TB- 109", "Unassigned"]
+        # Verify canonical TB-109 is included with correct metadata
+        self.assertIn("TB-109", self.vrooms, "Canonical 'TB-109' must be included in physical rooms.")
+        tb109_meta = self.vrooms["TB-109"]
+        self.assertEqual(tb109_meta["capacity"], 80)
+        self.assertEqual(tb109_meta["room_type"], "Classroom")
+        self.assertIn("smartboard", tb109_meta["equipment_set"])
+        self.assertIn("ac", tb109_meta["equipment_set"])
+        self.assertIn("wi-fi", tb109_meta["equipment_set"])
+        self.assertIn("power sockets", tb109_meta["equipment_set"])
+
+        # Verify invalid codes and unapproved strings are excluded, especially spaced alias 'TB- 109'
+        invalid_codes = ["EB1-1", "EB1-2", "EB2-2", "EB2-4", "TB- 109", "TB-102/108", "TB-102/112", "Unassigned"]
         for code in invalid_codes:
             self.assertNotIn(code, self.vrooms, f"Room '{code}' must not be in physical rooms.")
+
+    def test_tb109_selection_in_allocation(self):
+        """Canonical TB-109 is eligible and can be selected when a session requires
+        a classroom with compatible capacity (e.g. 75) and standard equipment.
+        """
+        # On Monday 09:00-09:50, only three 80-seater classrooms are free: TB-102, TB-109, TB-112.
+        # Allocating 3 concurrent sessions requiring 75 students will utilize all three, including TB-109.
+        s1 = SessionRequest("S1_75cap", "2026-08-10", "09:00", "09:50", 75, "Classroom", ("Smartboard", "AC"))
+        s2 = SessionRequest("S2_75cap", "2026-08-10", "09:00", "09:50", 75, "Classroom", ("Smartboard", "AC"))
+        s3 = SessionRequest("S3_75cap", "2026-08-10", "09:00", "09:50", 75, "Classroom", ("Smartboard", "AC"))
+        
+        result = self.solver.solve([s1, s2, s3])
+        self.assertEqual(result.status, "SUCCESS")
+        allocated_rooms = {alloc["room_number"] for alloc in result.allocations.values()}
+        self.assertIn("TB-109", allocated_rooms, "Canonical TB-109 must be selected for one of the concurrent sessions.")
 
     def test_single_session_allocation(self):
         """A single session with valid requirements is successfully allocated."""

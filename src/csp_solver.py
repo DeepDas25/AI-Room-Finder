@@ -104,7 +104,7 @@ class CSPSolver:
             "EB1-1", "EB1-2", "EB2-2", "EB2-4",
             "IET Amphi / IM Amphi",
             "TB-102/108", "TB-102/112",
-            "TB-109", "TB- 109",
+            "TB- 109",  # Spaced alias/duplicate remains strictly excluded
             "Unassigned", "Unspecified / TBD",
         }
 

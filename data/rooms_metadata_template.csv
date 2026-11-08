@@ -38,7 +38,7 @@ room_id,room_number,building,capacity,room_type,equipment,notes
 37,TB-105,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",
 38,TB-106,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",
 39,TB-107,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",
-40,TB-109,Technology Block (TB),,,,
+40,TB-109,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",Canonical physical room approved
 41,TB-112,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",
 42,TB-114,Technology Block (TB),80,Classroom,"AC,Smartboard,Wi-Fi,Power sockets",
 43,Unassigned,Unassigned,,,,
