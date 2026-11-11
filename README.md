@@ -403,7 +403,6 @@ python test_db.py
 
 The following modules represent planned future phases and are **NOT YET IMPLEMENTED**:
 
-- ❌ **A\* Search for Route Finding & Venue Recommendations:** Shortest-path navigation and walking-distance optimization between campus buildings (EB1, EB2, TB, IM).
 - ❌ **Machine Learning-Based Ghost-Booking Detection:** Attendance classification and historical occupancy pattern analysis to detect scheduled but unused rooms.
 - ❌ **Natural Language Processing (NLP) Room Search:** Conversational text/voice parser enabling natural language queries (e.g., *"Find a free computer lab near EB1 for 40 students at 2 PM"*).
 - ❌ **Interactive Streamlit Web Dashboard:** Interactive user interface for campus administrators, faculty, and students to visualize timetables, book free slots, and inspect room allocation graphs.
