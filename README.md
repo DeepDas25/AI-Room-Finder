@@ -1,6 +1,6 @@
 # AI Powered Intelligent Room Availability and Finder System
 
-A university room availability and intelligent room recommendation system that integrates timetable schedule data, physical room metadata, deterministic availability search, and Constraint Satisfaction Problem (CSP) algorithms to solve academic venue scheduling and room finding.
+A university room availability, intelligent room recommendation, and spatial navigation system that integrates timetable schedule data, physical room metadata, deterministic availability search, Constraint Satisfaction Problem (CSP) algorithms, A* shortest-route campus search, and a rule-based Natural Language Search Assistant to solve academic venue scheduling and room finding.
 
 ---
 
@@ -10,9 +10,9 @@ A university room availability and intelligent room recommendation system that i
 ---
 
 ## 2. Overview
-The **AI Powered Intelligent Room Availability and Finder System** is an AI-driven academic infrastructure platform developed to automate the detection of free university classrooms, resolve room allocation bottlenecks, and prevent scheduling conflicts.
+The **AI Powered Intelligent Room Availability and Finder System** is an AI-driven academic infrastructure platform developed to automate the detection of free university classrooms, resolve room allocation bottlenecks, prevent scheduling conflicts, compute optimal campus walking routes, and empower users with a conversational search assistant.
 
-By integrating parsed timetable PDFs across multiple semesters and faculties, normalizing physical campus facilities into structured relational schemas, and applying Artificial Intelligence algorithms (Constraint Satisfaction with Backtracking, Minimum Remaining Values, Degree Heuristic, and Forward Checking), the system delivers high-precision room availability tracking and multi-session allocation.
+By integrating parsed timetable PDFs across multiple semesters and faculties, normalizing physical campus facilities into structured relational schemas, and applying Artificial Intelligence algorithms (Constraint Satisfaction with Backtracking, Minimum Remaining Values, Degree Heuristic, Forward Checking, A* Shortest-Route Search, Multi-Criteria Recommendation with Physical Venue Alias Deduplication, and Natural Language Understanding), the system delivers high-precision room availability tracking, multi-session allocation, proximity-based recommendations, and conversational search.
 
 ---
 
@@ -22,6 +22,9 @@ In higher education institutions:
 - Timetables change dynamically across semesters, sections, elective batches, and effective date intervals (e.g., date-dependent venue handovers).
 - Ad-hoc room bookings, guest lectures, makeup classes, and examination schedules often lead to double-bookings, capacity mismatches, or venue underutilization.
 - Finding free, suitable rooms manually is error-prone, labor-intensive, and time-consuming.
+- Users often need rooms near their current location, but computing walking routes and proximity manually across campus complexes is cumbersome.
+- Physical venues sometimes have dual identities (e.g., `IET Amphitheatre` and `EB-006 (IET)`), which can cause double-booking or duplicate recommendations if treated as separate entities.
+- Non-technical faculty and students require a conversational interface to query rooms using plain English (e.g., *"Find a classroom for 40 students near EB2 tomorrow from 2 to 3 with a projector"*).
 
 ---
 
@@ -29,14 +32,17 @@ In higher education institutions:
 - **Centralize Campus Timetable & Venue Data:** Digitize, validate, and store heterogeneous academic timetable schedules and room inventory into a unified SQLite database.
 - **Accurate Temporal Conflict Detection:** Ensure non-overlapping intervals, date-dependent ranges, and alternate venue allocations are handled deterministically without false positives.
 - **Intelligent Constraint-Based Room Allocation:** Formulate and solve multi-session room assignment as a Constraint Satisfaction Problem (CSP) satisfying capacity, room type, facilities, timetable commitments, and mutual exclusion.
-- **Modular & Extensible AI Architecture:** Build decoupled foundational modules (Database $\rightarrow$ Availability Engine $\rightarrow$ CSP Solver) ready for future route-finding (A* Search) and intelligent user interfaces.
+- **Spatial Campus Routing via A\* Search:** Model academic complexes as a weighted graph and compute provably optimal walking routes and distances using admissible and consistent heuristics.
+- **Multi-Criteria Room Recommendation:** Rank available rooms based on spatial proximity (A* distance), seating capacity right-sizing, room classification, and facility requirements.
+- **Physical Venue Alias Deduplication:** Detect and resolve co-referent venue aliases (e.g., `IET Amphitheatre` and `EB-006 (IET)`), preventing cross-alias double bookings and duplicate recommendations.
+- **Natural Language Search Assistant:** Provide a zero-dependency, rule-based NLP assistant supporting general, building-filtered, proximity, ambiguous-building clarification, and detailed queries with robust validation.
 
 ---
 
 ## 5. Technologies Used
 - **Programming Language:** Python 3.10+
 - **Database Engine:** SQLite 3 (with foreign key constraints enabled)
-- **Data Processing:** Python Standard Library (`sqlite3`, `csv`, `pathlib`, `datetime`, `dataclasses`, `typing`, `unittest`, `subprocess`, `shutil`)
+- **Data Processing:** Python Standard Library (`sqlite3`, `csv`, `pathlib`, `datetime`, `dataclasses`, `typing`, `unittest`, `heapq`, `re`, `calendar`)
 - **PDF Extraction & Auditing:** Automated extraction pipeline parsing tabular PDF schedules into validated CSV datasets
 
 ---
@@ -45,21 +51,39 @@ In higher education institutions:
 
 ```mermaid
 flowchart TD
-    A["Timetable PDFs\n(1st, 3rd, 5th Sem Engineering & BBA)"] --> B["PDF Extraction & Cleaning Pipeline\n(src/extract_timetable.py, src/extract_sem5.py)"]
-    B --> C["Data Validation & Auditing\n(data/processed/*_approved.csv)"]
-    C --> D[("SQLite Relational Database\ndata/room_finder.db\n(856 timetable entries, 45 room rows)")]
-    
-    E["Room Metadata Template\n(data/rooms_metadata_template.csv)"] --> F["Metadata Importer & Normalizer\n(src/import_rooms_metadata.py)"]
-    F --> D
-    
-    D --> G["Room Availability Engine\n(src/availability_engine.py)"]
-    G --> H["find_available_rooms(date, start, end, min_capacity)"]
-    
-    H --> I["CSP Room Allocation Solver\n(src/csp_solver.py)"]
-    J["Batch Session Requests\n(capacity, room type, equipment)"] --> I
-    
-    I --> K["Backtracking Search + Dynamic MRV\n+ Degree Heuristic + Forward Checking"]
-    K --> L["Allocation Result\n(SUCCESS / INFEASIBLE + Metrics)"]
+    subgraph DataLayer["1. Data Layer"]
+        A["Timetable PDFs\n(1st, 3rd, 5th Sem Engineering & BBA)"] --> B["PDF Extraction & Cleaning Pipeline\n(src/extract_timetable.py, src/extract_sem5.py)"]
+        B --> C["Data Validation & Auditing\n(data/processed/*_approved.csv)"]
+        C --> D[("SQLite Relational Database\ndata/room_finder.db\n(856 timetable entries, 45 room rows)")]
+        
+        E["Room Metadata Template\n(data/rooms_metadata_template.csv)"] --> F["Metadata Importer & Normalizer\n(src/import_rooms_metadata.py)"]
+        F --> D
+    end
+
+    subgraph CoreEngines["2. Core Availability & Spatial Engines"]
+        D --> G["Room Availability Engine\n(src/availability_engine.py)"]
+        D --> BM["Building Mapper\n(src/building_mapper.py)"]
+        CG["Campus Graph\n(src/campus_graph.py)"] --> AS["A* Shortest Route Search\n(src/astar_search.py)"]
+    end
+
+    subgraph Solvers["3. AI Solvers & Recommendation"]
+        G --> CSP["CSP Room Allocation Solver\n(src/csp_solver.py)"]
+        Sess["Batch Session Requests\n(capacity, room type, equipment)"] --> CSP
+        CSP --> AllocRes["Allocation Result\n(SUCCESS / INFEASIBLE + Metrics)"]
+        
+        G --> RR["Room Recommender\n(src/room_recommender.py)\n(Alias Conflict Detection & Deduplication)"]
+        BM --> RR
+        AS --> RR
+        D --> RR
+    end
+
+    subgraph NLPLayer["4. Conversational Assistant Layer"]
+        UserQuery["Natural Language User Request\n('Find a room for 40 in EB2 tomorrow 2 to 3')"] --> NLP["Natural Language Search Assistant\n(src/nlp_assistant.py)"]
+        NLP -->|"Clarification Needed"| Clarify["Clarification Prompt & Selectable Options\n(EB1, EB2, TB, IM)"]
+        NLP -->|"Construct Query"| RecQuery["RecommendationQuery\n(filter, proximity, date, time, capacity)"]
+        RecQuery --> RR
+        RR --> FinalRecs["Ranked Recommendations\n(Distance, Capacity, Route, Metadata)"]
+    end
 ```
 
 ---
@@ -180,12 +204,61 @@ Tracks metadata for source timetable PDF documents.
 ### 5. CSP Room Allocation Solver (`src/csp_solver.py`)
 - Formulates multi-session room scheduling as a Constraint Satisfaction Problem.
 - Features `SessionRequest`, `AllocationResult`, and `CSPSolver`.
-- Dynamically allocates rooms for concurrent or sequential session requests.
+- Dynamically allocates rooms for concurrent or sequential session requests using backtracking, MRV, Degree Heuristic, and Forward Checking.
+
+### 6. Campus Graph Representation (`src/campus_graph.py`)
+- Models academic campus nodes (`EB1`, `EB2`, `TB`, `IM`) and 4 bidirectional connections:
+  - EB2 $\longleftrightarrow$ EB1: 5 metres
+  - EB1 $\longleftrightarrow$ TB: 10 metres
+  - EB1 $\longleftrightarrow$ IM: 40 metres
+  - EB2 $\longleftrightarrow$ IM: 50 metres
+- Implements an admissible and monotonic consistent heuristic $h(u, v)$ for A* search based on minimum hop distance scaled by minimum edge weight ($5 \times \text{min\_hops}$).
+
+### 7. A* Shortest Route Search Engine (`src/astar_search.py`)
+- Core function: `find_shortest_route(start_building, goal_building) -> RouteResult`.
+- Uses `heapq` priority queue over $f(n) = g(n) + h(n)$ with deterministic tie-breaking.
+- Computes exact walking routes and optimal path distances (e.g., EB2 $\rightarrow$ IM via EB1 is $5 + 40 = 45$m, outperforming the direct 50m path).
+
+### 8. Campus Building Mapper (`src/building_mapper.py`)
+- Maps heterogeneous room numbers and building strings to canonical campus nodes (`EB1`, `EB2`, `TB`, `IM`).
+- Normalizes special venues: `AIC` $\rightarrow$ `EB2`, `BYOD` & Tech Block CS Labs $\rightarrow$ `TB`, `EB-006` & `IET Amphitheatre` $\rightarrow$ `EB1`, `IM Amphitheatre` $\rightarrow$ `IM`.
+- Strictly maintains unconfirmed or external specialized locations (e.g. `LRC002`, `LRC007`) as unmapped (`None`) without heuristic guessing.
+
+### 9. Intelligent Room Recommender (`src/room_recommender.py`)
+- Multi-criteria recommendation engine combining availability checking (`availability_engine`), capacity, room type, equipment filtering, and spatial proximity via A* shortest walking distance.
+- Features `RecommendationQuery` and `RecommendedRoom`.
+- Supports three query modes:
+  - **Campus-Wide Search (`preferred_building=None`):** Evaluates all available rooms across campus without distance bias (`walking_distance=None`, `walking_route=None`).
+  - **Building-Specific Filter (`filter_building="EB2"`):** Restricts candidates strictly to the canonical campus node.
+  - **Proximity-Based Search (`preferred_building="EB2"`):** Computes A* walking distance and route from starting location across all eligible buildings.
+- **Physical Venue Alias Deduplication:**
+  - Manages co-referent venue aliases (`IET Amphitheatre` as canonical and `EB-006 (IET)` as alias).
+  - Performs cross-alias conflict detection: booking either alias marks both as unavailable.
+  - Returns only canonical `IET Amphitheatre` when both aliases are free, backed by canonical database metadata.
+- **Deterministic Ranking:** Walking distance (ascending) $\rightarrow$ seating capacity (ascending for right-sizing) $\rightarrow$ room number (alphabetical).
+
+### 10. Natural Language Search Assistant (`src/nlp_assistant.py`)
+- Lightweight, zero-dependency rule-based conversational room search assistant.
+- Core function: `process_natural_language_request(user_input, reference_now=None, include_unmapped_buildings=False) -> NLPResponse`.
+- Converts plain-English queries into validated `RecommendationQuery` structures.
+- Supported conversational behaviors:
+  - **General Search:** *"Find an empty room now"* $\rightarrow$ campus-wide search for a 60-minute window starting from current time.
+  - **Specific Building:** *"Find an empty room in EB2"* $\rightarrow$ `filter_building="EB2"`.
+  - **Ambiguous Building Clarification:** *"Find an empty room in this building"* $\rightarrow$ returns `NEEDS_CLARIFICATION` status with prompt *"Which building are you referring to?"* and selectable options `["EB1", "EB2", "IM", "TB"]`.
+  - **Nearby Search:** *"Find an empty room near EB2"* $\rightarrow$ `preferred_building="EB2"`.
+  - **Detailed Search:** Extracts room types (`Classroom`, `Computer Lab`, `Seminar Room`), capacity (`for 40 students`), equipment (`smartboard`, `projector`, `ac`), dates (`today`, `tomorrow`, weekdays, ISO/DMY/month names), university time shorthand (`2 to 3` $\rightarrow$ 14:00–15:00), and durations (`for 1 hour`).
+- **Robust Validation & Error Handling:**
+  - Rejects invalid 12-hour times (`25 PM`, `13 PM`, `0 PM`) and 24-hour times (`25:00`, `10:75`).
+  - Rejects impossible dates (`2026-99-45`, `31/02/2026`) immediately before query construction without generating invalid derived times.
+  - Rejects negative durations (`for -2 hours`), zero duration (`for 0 minutes`), and durations extending past midnight.
+  - Rejects inverted ranges (`from 15 to 10`).
+  - Returns structured `NLPResponse(status="ERROR", error_message=...)` without application crashes.
 
 ---
 
-## 10. CSP Algorithm Explanation
+## 10. Algorithmic Deep Dives
 
+### 10.1 CSP Room Allocation Algorithm
 The CSP solver assigns physical rooms to academic session requests satisfying all hard constraints:
 
 ```mermaid
@@ -218,20 +291,30 @@ flowchart TD
     MoreRooms -- No --> BacktrackFail(["Restore var to unassigned & Return False"])
 ```
 
-### Key AI Techniques Implemented:
-1. **Backtracking Search (DFS):**
-   - Systematically navigates the search space of room assignments.
-   - If a dead end is reached downstream, previous assignments are undone.
-   - Overall problem is declared `INFEASIBLE` only after exhaustive exploration from the root call.
-2. **Dynamic Minimum Remaining Values (MRV):**
-   - At each recursive level, selects the unassigned session with the smallest current domain size $|D(s)|$.
-   - Prioritizes highly constrained sessions (fail-first principle) to minimize search depth.
-3. **Degree Heuristic Tie-Breaker:**
-   - If multiple sessions have identical domain sizes, breaks ties by choosing the session with the most unassigned conflicting neighbors in the conflict graph.
-4. **Forward Checking with Exact Domain Restoration:**
-   - When a room is assigned to session $s$, it is immediately pruned from the domains of all overlapping, unassigned neighbor sessions.
-   - If any neighbor's domain is reduced to zero (domain wipeout), the branch is pruned immediately without redundant recursive exploration.
-   - A localized ledger (`pruned_from`) tracks exact removals so that on backtrack, **only the rooms removed by that specific assignment are restored**.
+#### Key AI Techniques in CSP Solver:
+1. **Backtracking Search (DFS):** Systematically explores assignments and backtracks upon conflict.
+2. **Dynamic Minimum Remaining Values (MRV):** Prioritizes sessions with the smallest domain size $|D(s)|$.
+3. **Degree Heuristic Tie-Breaker:** Breaks MRV ties by selecting the session with the most unassigned conflicting neighbors.
+4. **Forward Checking with Exact Domain Restoration:** Immediately prunes assigned rooms from conflicting neighbors, detecting domain wipeouts early with localized restoration.
+
+### 10.2 A* Shortest Route Search Algorithm
+The A* search algorithm computes the optimal walking path and distance between campus buildings:
+- **Evaluation Function:** $f(n) = g(n) + h(n)$
+  - $g(n)$: Exact accumulated walking distance from starting building to node $n$.
+  - $h(n)$: Admissible heuristic $h(n) = 5 \times \text{min\_hops}(n, \text{goal})$, guaranteeing that $h(n) \le h^*(n)$ for all pairs.
+- **Consistency (Monotonicity):** For any edge $(u, v)$ with weight $w(u, v)$:
+  $$h(u) \le w(u, v) + h(v)$$
+  Ensuring no re-expansion of previously closed nodes.
+- **Priority Queue:** Implemented via Python's `heapq` with entry tuple `(f_score, g_score, current_node, path)`.
+
+### 10.3 Physical Venue Alias Deduplication
+Physical venue aliases occur when multiple identifiers refer to the same physical room:
+- **Canonical Venue:** `IET Amphitheatre`
+- **Known Alias:** `EB-006 (IET)`
+- **Cross-Alias Conflict Resolution:**
+  1. Both aliases are checked for bookings in `timetable_entries`.
+  2. If *either* alias is booked during the requested date/time, the *entire physical venue* is suppressed from recommendations.
+  3. If *both* aliases are free, only the canonical name `IET Amphitheatre` is returned, populated with metadata loaded from the canonical database record.
 
 ---
 
@@ -254,7 +337,10 @@ AI_project/
 │   └── rooms_metadata_template.csv             # Room metadata inventory template
 ├── src/
 │   ├── __init__.py                             # Package initialization
+│   ├── astar_search.py                         # A* shortest-path routing between buildings
 │   ├── availability_engine.py                  # Temporal availability search engine
+│   ├── building_mapper.py                      # Campus node normalizer & alias resolver
+│   ├── campus_graph.py                         # Spatial campus graph & heuristic functions
 │   ├── count_rows.py                           # Dataset row verification utility
 │   ├── create_approved_dataset.py              # Approved dataset generator
 │   ├── csp_solver.py                           # CSP Room Allocation Solver (AI Engine)
@@ -264,9 +350,16 @@ AI_project/
 │   ├── extract_timetable.py                    # Semester 1, 3, BBA timetable extraction
 │   ├── import_rooms_metadata.py                # Idempotent room metadata database updater
 │   ├── import_to_db.py                         # Timetable dataset database importer
+│   ├── nlp_assistant.py                        # Natural Language Search Assistant
+│   ├── room_recommender.py                     # Multi-criteria recommendation & alias engine
+│   ├── test_astar_search.py                    # A* search unit tests (7 tests)
 │   ├── test_availability_engine.py             # Availability engine unit tests (6 tests)
+│   ├── test_building_mapper.py                 # Building mapper unit tests (8 tests)
+│   ├── test_campus_graph.py                    # Campus graph & heuristic unit tests (7 tests)
 │   ├── test_csp_solver.py                      # CSP solver unit tests (13 tests)
+│   ├── test_nlp_assistant.py                   # NLP assistant unit tests (18 tests)
 │   ├── test_room_metadata.py                   # Room metadata unit tests (7 tests)
+│   ├── test_room_recommender.py                # Recommender & alias unit tests (43 tests)
 │   ├── validate_data.py                        # Dataset validation and integrity auditor
 │   └── verify_import.py                        # Database import verification script
 ├── test_db.py                                  # Database foundation test script
@@ -288,7 +381,7 @@ cd C:\Users\deepa\OneDrive\Desktop\AI_project
 ```
 
 ### Verify Environment
-No third-party packages or heavy dependencies are required for the core database, availability engine, or CSP solver; the system runs entirely on the **Python standard library**.
+No third-party packages or heavy dependencies are required; the entire system runs strictly on the **Python standard library**.
 
 ---
 
@@ -305,13 +398,58 @@ To find free rooms on a specific date, time slot, and minimum capacity:
 python src/availability_engine.py 2026-08-10 09:00 09:50 50
 ```
 
-### 3. Run CSP Allocation Programmatically
+### 3. Query Room Recommendations Programmatically
+```python
+from src.room_recommender import RecommendationQuery, recommend_rooms
+
+query = RecommendationQuery(
+    preferred_building="EB2",
+    date="2026-08-10",
+    start_time="10:00",
+    end_time="11:00",
+    min_capacity=40,
+    required_room_type="Classroom",
+    required_equipment=("Smartboard",),
+)
+
+rooms = recommend_rooms(query)
+for r in rooms:
+    print(f"Room: {r.room_number} | Node: {r.campus_node} | Distance: {r.walking_distance}m | Route: {' -> '.join(r.walking_route)}")
+```
+
+### 4. Search Rooms Using Natural Language
+```python
+from src.nlp_assistant import process_natural_language_request
+
+# Conversational query
+res = process_natural_language_request("Find a classroom for 40 students in EB2 tomorrow from 2 to 3 with a projector.")
+
+if res.status == "SUCCESS":
+    print(f"Found {len(res.recommendations)} matching rooms:")
+    for r in res.recommendations:
+        print(f"- {r.room_number} (Capacity: {r.capacity}, Type: {r.room_type})")
+elif res.status == "NEEDS_CLARIFICATION":
+    print(f"Clarification: {res.clarification_prompt}")
+    print(f"Options: {', '.join(res.options)}")
+else:
+    print(f"Error: {res.error_message}")
+```
+
+### 5. Find Shortest Walking Routes (A* Search)
+```python
+from src.astar_search import find_shortest_route
+
+route = find_shortest_route("EB2", "IM")
+print(f"Route: {' -> '.join(route.path)} (Distance: {route.total_distance} metres)")
+# Route: EB2 -> EB1 -> IM (Distance: 45.0 metres)
+```
+
+### 6. Run CSP Multi-Session Allocation
 ```python
 from src.csp_solver import CSPSolver, SessionRequest
 
 solver = CSPSolver()
 
-# Define session requests
 sessions = [
     SessionRequest(
         session_id="CS301_Lab",
@@ -330,11 +468,10 @@ sessions = [
         expected_students=75,
         required_room_type="Classroom",
         required_equipment=("Smartboard", "AC"),
-    )
+    ),
 ]
 
 result = solver.solve(sessions)
-
 if result.status == "SUCCESS":
     for session_id, alloc in result.allocations.items():
         print(f"[{session_id}] -> Room {alloc['room_number']} ({alloc['building']})")
@@ -342,7 +479,7 @@ else:
     print(f"Allocation Infeasible: {result.reason}")
 ```
 
-### 4. Re-export or Re-import Room Metadata
+### 7. Re-export or Re-import Room Metadata
 ```bash
 # Export current metadata template
 python src/export_rooms_template.py
@@ -355,7 +492,7 @@ python -m src.import_rooms_metadata
 
 ## 14. Running Tests
 
-The test suite covers database constraints, room metadata, temporal availability queries, and CSP solver operations.
+The test suite covers database constraints, room metadata, availability queries, CSP solver operations, graph heuristics, A* pathfinding, building mappings, room recommendations with alias deduplication, and natural language search.
 
 ### Run All Unit and Regression Tests
 Execute the test runner from the root directory:
@@ -374,13 +511,28 @@ python -m unittest src/test_room_metadata.py -v
 # 3. Test CSP Room Allocation Engine (13 tests)
 python -m unittest src/test_csp_solver.py -v
 
-# 4. Test Database Foundation (test_db.py)
+# 4. Test Campus Graph & Heuristics (7 tests)
+python -m unittest src/test_campus_graph.py -v
+
+# 5. Test A* Search Route Navigation (7 tests)
+python -m unittest src/test_astar_search.py -v
+
+# 6. Test Campus Building Mapper (8 tests)
+python -m unittest src/test_building_mapper.py -v
+
+# 7. Test Room Recommender & Alias Deduplication (43 tests)
+python -m unittest src/test_room_recommender.py -v
+
+# 8. Test Natural Language Search Assistant (18 tests)
+python -m unittest src/test_nlp_assistant.py -v
+
+# 9. Test Database Foundation (test_db.py)
 python test_db.py
 ```
 
 ### Current Test Suite Status
-- **Total Test Cases Executed:** **26 tests**
-- **Passed:** **26**
+- **Total Test Cases Executed:** **109 tests**
+- **Passed:** **109**
 - **Failed:** **0**
 - **Status:** **100% OK**
 
@@ -395,15 +547,36 @@ python test_db.py
 | **Phase 3: Room Metadata Standardization** | **Completed** | Physical room capacity, room types, and facility equipment populated; 35 approved physical rooms active. |
 | **Phase 4: Room Availability Engine** | **Completed** | Temporal conflict detection, partial overlaps, capacity filtering, and date-range support fully verified. |
 | **Phase 5: CSP Room Allocation Engine** | **Completed** | Backtracking Search with dynamic MRV, Degree Heuristic, Forward Checking, and exact domain restoration. |
-| **Phase 6: Full Regression Verification** | **Completed** | 26 automated unit tests passing consistently across all implemented components. |
+| **Phase 6: Campus Graph & A\* Search** | **Completed** | Spatial graph modeling academic blocks, consistent admissible heuristics, and optimal route navigation. |
+| **Phase 7: Building Normalization Mapper** | **Completed** | Resolves campus node codes, specialized facilities (AIC, BYOD), and strict unmapped room preservation. |
+| **Phase 8: Room Recommender & Alias Fix** | **Completed** | Multi-criteria ranking, campus-wide & building filtering, and physical venue alias deduplication (`IET Amphitheatre` / `EB-006 (IET)`). |
+| **Phase 9: Natural Language Search Assistant** | **Completed** | Rule-based conversational assistant supporting general, nearby, building-filtered, and detailed queries with robust validation. |
+| **Phase 10: Full Regression Verification** | **Completed** | 109 automated unit tests passing across all 8 test suites with 100% success rate. |
 
 ---
 
-## 16. Future Enhancements
+## 16. Future Scope & Enhancements
 
-The following modules represent planned future phases and are **NOT YET IMPLEMENTED**:
+The following modules represent planned future phases and research directions:
 
-- ❌ **Machine Learning-Based Ghost-Booking Detection:** Attendance classification and historical occupancy pattern analysis to detect scheduled but unused rooms.
-- ❌ **Natural Language Processing (NLP) Room Search:** Conversational text/voice parser enabling natural language queries (e.g., *"Find a free computer lab near EB1 for 40 students at 2 PM"*).
-- ❌ **Interactive Streamlit Web Dashboard:** Interactive user interface for campus administrators, faculty, and students to visualize timetables, book free slots, and inspect room allocation graphs.
-- ❌ **End-to-End System Integration & Deployment:** Unified packaging, automated integration pipelines, and institutional calendar synchronization.
+### 16.1 ML-Based Ghost Booking Detection (Research Direction)
+
+A potential future enhancement is an ML-based Ghost Booking Detection module to identify rooms that are reserved in timetables or booking systems but may remain underutilized or vacant.
+
+- **Objective:** Estimate the likelihood of a scheduled room reservation being unused.
+- **Potential Features:** Historical room utilization, booking schedules, day of the week, time slots, room capacity, department, and course characteristics.
+- **Candidate Models:** Logistic Regression, Random Forest, and Gradient Boosted Trees (XGBoost / LightGBM).
+- **Data Requirements:** Reliable model training requires historical room occupancy data with verified utilization labels, potentially collected through privacy-conscious occupancy sensors, authorized attendance records, or room check-in logs.
+- **Current Status:** Proposed research direction. This feature is not implemented because reliable historical occupancy labels are not currently available.
+
+### 16.2 Interactive Streamlit Web Dashboard
+
+- Develop an interactive web interface for campus administrators, faculty, and students.
+- Visualize room availability, timetable information, and room recommendations.
+- Display campus walking routes and distances.
+- Integrate the Natural Language Search Assistant for conversational room discovery.
+
+### 16.3 Institutional Calendar Synchronization & Deployment
+
+- Explore integration with Google Calendar and Microsoft Outlook / Exchange for institutional schedule synchronization.
+- Develop automated deployment pipelines and institutional schedule synchronization workflows.
