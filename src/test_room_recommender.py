@@ -661,5 +661,188 @@ class TestRealDatabaseIntegration(unittest.TestCase):
             self.assertEqual(r.room_type, "Seminar Room")
 
 
+# ---------------------------------------------------------------------------
+# IET Alias Availability Protection Tests (Scenarios 1-9)
+# ---------------------------------------------------------------------------
+
+class TestIETAliasAvailabilityProtection(unittest.TestCase):
+    """Dedicated tests for physical venue alias protection between
+    canonical 'IET Amphitheatre' and alias 'EB-006 (IET)'.
+    """
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_01_eb006_booked_suppresses_iet_amphitheatre(self, mock_avail, mock_meta):
+        """1. EB-006 (IET) is booked, so IET Amphitheatre must not be recommended."""
+        mock_avail.return_value = [
+            {"room_number": "IET Amphitheatre", "building": "Campus Amphitheatres", "capacity": 100},
+            {"room_number": "TB-102", "building": "Technology Block (TB)", "capacity": 80},
+        ]
+        mock_meta.return_value = {
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+            "TB-102": FAKE_METADATA["TB-102"],
+        }
+        results = recommend_rooms(_make_query(preferred_building="EB1"))
+        room_numbers = [r.room_number for r in results]
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertIn("TB-102", room_numbers)
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_02_iet_amphitheatre_booked_suppresses_eb006(self, mock_avail, mock_meta):
+        """2. IET Amphitheatre is booked, so EB-006 (IET) must not be recommended."""
+        mock_avail.return_value = [
+            {"room_number": "EB-006 (IET)", "building": "Engineering Block (EB)", "capacity": 100},
+            {"room_number": "TB-102", "building": "Technology Block (TB)", "capacity": 80},
+        ]
+        mock_meta.return_value = {
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+            "TB-102": FAKE_METADATA["TB-102"],
+        }
+        results = recommend_rooms(_make_query(preferred_building="EB1"))
+        room_numbers = [r.room_number for r in results]
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertIn("TB-102", room_numbers)
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_03_both_aliases_free_returns_single_canonical_recommendation(self, mock_avail, mock_meta):
+        """3. Both aliases are available, so exactly one canonical recommendation is returned."""
+        mock_avail.return_value = [
+            {"room_number": "IET Amphitheatre", "building": "Campus Amphitheatres", "capacity": 100},
+            {"room_number": "EB-006 (IET)", "building": "Engineering Block (EB)", "capacity": 100},
+        ]
+        mock_meta.return_value = {
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+        }
+        results = recommend_rooms(_make_query(preferred_building="EB1"))
+        room_numbers = [r.room_number for r in results]
+        self.assertEqual(len(results), 1)
+        self.assertIn("IET Amphitheatre", room_numbers)
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertEqual(results[0].room_number, "IET Amphitheatre")
+        self.assertEqual(results[0].building, "Campus Amphitheatres")
+        self.assertEqual(results[0].capacity, 100)
+        self.assertEqual(results[0].room_type, "Seminar Room")
+        self.assertEqual(results[0].campus_node, "EB1")
+        self.assertEqual(results[0].walking_distance, 0.0)
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_04_both_aliases_booked_returns_neither(self, mock_avail, mock_meta):
+        """4. Both aliases are booked, so neither is recommended."""
+        mock_avail.return_value = [
+            {"room_number": "TB-102", "building": "Technology Block (TB)", "capacity": 80},
+        ]
+        mock_meta.return_value = {
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+            "TB-102": FAKE_METADATA["TB-102"],
+        }
+        results = recommend_rooms(_make_query(preferred_building="EB1"))
+        room_numbers = [r.room_number for r in results]
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertIn("TB-102", room_numbers)
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_05_alias_conflict_respects_date_specific_availability(self, mock_avail, mock_meta):
+        """5. Alias conflict detection respects date-specific timetable availability."""
+        # On date within semester where EB-006 is booked, only IET Amphitheatre returned by engine
+        mock_avail.return_value = [
+            {"room_number": "IET Amphitheatre", "building": "Campus Amphitheatres", "capacity": 100},
+        ]
+        mock_meta.return_value = {
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+        }
+        results_booked_date = recommend_rooms(_make_query(date="2026-08-13", preferred_building="EB1"))
+        self.assertEqual([r.room_number for r in results_booked_date], [])
+
+        # On date outside booking where both are free -> canonical returned
+        mock_avail.return_value = [
+            {"room_number": "IET Amphitheatre", "building": "Campus Amphitheatres", "capacity": 100},
+            {"room_number": "EB-006 (IET)", "building": "Engineering Block (EB)", "capacity": 100},
+        ]
+        results_free_date = recommend_rooms(_make_query(date="2027-01-10", preferred_building="EB1"))
+        self.assertEqual([r.room_number for r in results_free_date], ["IET Amphitheatre"])
+
+    @patch("src.room_recommender._load_room_metadata")
+    @patch("src.room_recommender.find_available_rooms")
+    def test_06_unrelated_rooms_unaffected_by_alias_conflict_detection(self, mock_avail, mock_meta):
+        """6. Unrelated rooms remain unaffected by alias conflict detection."""
+        mock_avail.return_value = [
+            {"room_number": "TB-102", "building": "Technology Block (TB)", "capacity": 80},
+            {"room_number": "EB2-001", "building": "Engineering Block 2 (EB-2)", "capacity": 60},
+            {"room_number": "IET Amphitheatre", "building": "Campus Amphitheatres", "capacity": 100},
+        ]
+        mock_meta.return_value = {
+            "TB-102": FAKE_METADATA["TB-102"],
+            "EB2-001": FAKE_METADATA["EB2-001"],
+            "IET Amphitheatre": FAKE_METADATA["IET Amphitheatre"],
+            "EB-006 (IET)": FAKE_METADATA["EB-006 (IET)"],
+        }
+        results = recommend_rooms(_make_query(preferred_building="EB2"))
+        room_numbers = [r.room_number for r in results]
+        self.assertIn("EB2-001", room_numbers)
+        self.assertIn("TB-102", room_numbers)
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertEqual(len(results), 2)
+
+    def test_07_real_db_thursday_13_to_14_iet_venue_suppressed(self):
+        """7. Real database: Thursday 13:00-14:00 EB-006 (IET) is booked -> neither alias recommended."""
+        query = _make_query(
+            preferred_building="EB1",
+            date="2026-11-12",  # Thursday
+            start_time="13:00",
+            end_time="14:00",
+            min_capacity=0,
+        )
+        results = recommend_rooms(query)
+        room_numbers = [r.room_number for r in results]
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+
+    def test_08_real_db_monday_11_to_12_iet_venue_suppressed(self):
+        """8. Real database: Monday 11:00-12:00 IET Amphitheatre is booked -> neither alias recommended."""
+        query = _make_query(
+            preferred_building="EB1",
+            date="2026-11-16",  # Monday
+            start_time="11:00",
+            end_time="12:00",
+            min_capacity=0,
+        )
+        results = recommend_rooms(query)
+        room_numbers = [r.room_number for r in results]
+        self.assertNotIn("EB-006 (IET)", room_numbers)
+        self.assertNotIn("IET Amphitheatre", room_numbers)
+
+    def test_09_real_db_both_aliases_free_canonical_displayed_once(self):
+        """9. Real database: When both aliases are free, exactly one recommendation appears as IET Amphitheatre."""
+        query = _make_query(
+            preferred_building="EB1",
+            date="2026-11-16",  # Monday 09:00-10:00 is free for both aliases
+            start_time="09:00",
+            end_time="10:00",
+            min_capacity=0,
+        )
+        results = recommend_rooms(query)
+        iet_rooms = [r for r in results if r.room_number in ("IET Amphitheatre", "EB-006 (IET)")]
+        self.assertEqual(len(iet_rooms), 1)
+        self.assertEqual(iet_rooms[0].room_number, "IET Amphitheatre")
+        self.assertEqual(iet_rooms[0].building, "Campus Amphitheatres")
+        self.assertEqual(iet_rooms[0].capacity, 100)
+        self.assertEqual(iet_rooms[0].room_type, "Seminar Room")
+        self.assertEqual(iet_rooms[0].campus_node, "EB1")
+        self.assertEqual(iet_rooms[0].walking_distance, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()
