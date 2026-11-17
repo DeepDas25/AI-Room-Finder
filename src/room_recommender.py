@@ -106,9 +106,10 @@ class RecommendationQuery:
 
     Attributes
     ----------
-    preferred_building : str
+    preferred_building : Optional[str]
         Campus graph node the user is closest to / starting from.
-        Must be one of: 'EB1', 'EB2', 'TB', 'IM'.
+        When provided, must be one of: 'EB1', 'EB2', 'TB', 'IM'.
+        When None, a campus-wide search is performed with no A* distance calculation.
     date : str
         Target date in ``YYYY-MM-DD`` format.
     start_time : str
@@ -123,14 +124,20 @@ class RecommendationQuery:
     required_equipment : Tuple[str, ...]
         Each item must be present in the room's equipment list.
         Case-insensitive item-by-item comparison. Empty tuple means no restriction.
+    filter_building : Optional[str]
+        When specified, restricts recommendations strictly to rooms whose
+        canonical campus node matches this building (e.g. 'EB2').
+        Must be one of: 'EB1', 'EB2', 'TB', 'IM' if provided.
+        When None, rooms across all buildings are eligible.
     """
-    preferred_building: str
-    date: str
-    start_time: str
-    end_time: str
+    preferred_building: Optional[str] = None
+    date: str = ""
+    start_time: str = ""
+    end_time: str = ""
     min_capacity: int = 0
     required_room_type: Optional[str] = None
     required_equipment: Tuple[str, ...] = field(default_factory=tuple)
+    filter_building: Optional[str] = None
 
 
 @dataclass
@@ -176,17 +183,26 @@ def _validate_query(query: RecommendationQuery) -> None:
     """Raise ``ValueError`` for any malformed query field.
 
     Validates:
-    - ``preferred_building`` is a known campus graph node.
+    - ``preferred_building`` is a known campus graph node if provided.
+    - ``filter_building`` is a known campus graph node if provided.
     - ``date`` follows ``YYYY-MM-DD``.
     - ``start_time`` and ``end_time`` follow ``HH:MM`` (24-hour).
     - ``start_time`` is strictly earlier than ``end_time``.
     - ``min_capacity`` is non-negative.
     """
-    if query.preferred_building not in VALID_CAMPUS_NODES:
-        raise ValueError(
-            f"Invalid preferred_building '{query.preferred_building}'. "
-            f"Must be one of: {sorted(VALID_CAMPUS_NODES)}."
-        )
+    if query.preferred_building is not None:
+        if query.preferred_building not in VALID_CAMPUS_NODES:
+            raise ValueError(
+                f"Invalid preferred_building '{query.preferred_building}'. "
+                f"Must be one of: {sorted(VALID_CAMPUS_NODES)}."
+            )
+
+    if query.filter_building is not None:
+        if query.filter_building not in VALID_CAMPUS_NODES:
+            raise ValueError(
+                f"Invalid filter_building '{query.filter_building}'. "
+                f"Must be one of: {sorted(VALID_CAMPUS_NODES)}."
+            )
 
     try:
         datetime.datetime.strptime(query.date, "%Y-%m-%d")
@@ -421,9 +437,20 @@ def recommend_rooms(
     for room_meta in candidates:
         campus_node = get_campus_node(room_meta["room_number"], room_meta["building"])
 
+        # If filter_building is specified, only include rooms matching that canonical node
+        if query.filter_building is not None and campus_node != query.filter_building:
+            continue
+
         if campus_node is not None:
-            # Mapped room: compute A* walking distance
-            route_result = find_shortest_route(query.preferred_building, campus_node)
+            # Mapped room: compute A* walking distance only if preferred_building is specified
+            if query.preferred_building is not None:
+                route_result = find_shortest_route(query.preferred_building, campus_node)
+                dist: Optional[float] = route_result["total_distance"]
+                route: Optional[List[str]] = route_result["path"]
+            else:
+                dist = None
+                route = None
+
             mapped_results.append(RecommendedRoom(
                 room_number=room_meta["room_number"],
                 building=room_meta["building"],
@@ -431,8 +458,8 @@ def recommend_rooms(
                 capacity=room_meta["capacity"],
                 room_type=room_meta["room_type"],
                 equipment=room_meta["equipment_raw"],
-                walking_distance=route_result["total_distance"],
-                walking_route=route_result["path"],
+                walking_distance=dist,
+                walking_route=route,
             ))
         else:
             # Unmapped room: never invent distance or route
@@ -448,10 +475,17 @@ def recommend_rooms(
             ))
 
     # Step G: Deterministic ranking
-    # Mapped rooms: ascending (distance, capacity, room_number)
-    mapped_results.sort(
-        key=lambda r: (r.walking_distance, r.capacity, r.room_number)
-    )
+    if query.preferred_building is not None:
+        # Distance-ranked: ascending (distance, capacity, room_number)
+        mapped_results.sort(
+            key=lambda r: (r.walking_distance, r.capacity, r.room_number)
+        )
+    else:
+        # Campus-wide search without preferred building: no distance bias
+        mapped_results.sort(
+            key=lambda r: (r.capacity, r.room_number)
+        )
+
     # Unmapped rooms (if included): ascending (capacity, room_number)
     unmapped_results.sort(key=lambda r: (r.capacity, r.room_number))
 
