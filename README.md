@@ -105,10 +105,10 @@ For future spatial route-finding and allocation optimization, the following walk
 
 | Route Between Buildings | Assumed Distance |
 | :--- | :---: |
-| **EB2 $\longleftrightarrow$ EB1** | **5 metres** |
-| **EB1 $\longleftrightarrow$ Technical Block (TB)** | **10 metres** |
-| **EB1 $\longleftrightarrow$ Management Building (IM)** | **40 metres** |
-| **EB2 $\longleftrightarrow$ Management Building (IM)** | **50 metres** |
+| **EB2** $\longleftrightarrow$ **EB1** | **5 metres** |
+| **EB1** $\longleftrightarrow$ **Technical Block (TB)** | **10 metres** |
+| **EB1** $\longleftrightarrow$ **Management Building (IM)** | **40 metres** |
+| **EB2** $\longleftrightarrow$ **Management Building (IM)** | **50 metres** |
 
 > **Note on Spatial Data:** These distances represent **approximate initial assumptions** for algorithmic route modeling and do not constitute measured campus geodetic survey data.
 
@@ -198,7 +198,11 @@ Tracks metadata for source timetable PDF documents.
 - Validates 24-hour time formatting and calendar dates.
 - Translates calendar dates to weekdays and evaluates whether entries fall within `[effective_start_date, effective_end_date]`.
 - Implements strict interval non-overlap condition:
-  $$\neg (\text{entry.end\_time} \le \text{req.start\_time} \lor \text{entry.start\_time} \ge \text{req.end\_time})$$
+
+  $$
+  \neg (\text{entry.end\textunderscore time} \le \text{req.start\textunderscore time} \lor \text{entry.start\textunderscore time} \ge \text{req.end\textunderscore time})
+  $$
+
 - Returns matching free rooms sorted by `room_number`.
 
 ### 5. CSP Room Allocation Solver (`src/csp_solver.py`)
@@ -212,12 +216,12 @@ Tracks metadata for source timetable PDF documents.
   - EB1 $\longleftrightarrow$ TB: 10 metres
   - EB1 $\longleftrightarrow$ IM: 40 metres
   - EB2 $\longleftrightarrow$ IM: 50 metres
-- Implements an admissible and monotonic consistent heuristic $h(u, v)$ for A* search based on minimum hop distance scaled by minimum edge weight ($5 \times \text{min\_hops}$).
+- Implements an admissible and monotonic consistent heuristic $h(u, v)$ for A* search based on minimum hop distance scaled by minimum edge weight ($5 \times \text{min\textunderscore hops}$).
 
 ### 7. A* Shortest Route Search Engine (`src/astar_search.py`)
 - Core function: `find_shortest_route(start_building, goal_building) -> RouteResult`.
 - Uses `heapq` priority queue over $f(n) = g(n) + h(n)$ with deterministic tie-breaking.
-- Computes exact walking routes and optimal path distances (e.g., EB2 $\rightarrow$ IM via EB1 is $5 + 40 = 45$m, outperforming the direct 50m path).
+- Computes exact walking routes and optimal path distances (e.g., EB2 $\rightarrow$ IM via EB1 is $5 + 40 = 45\text{ m}$, outperforming the direct 50m path).
 
 ### 8. Campus Building Mapper (`src/building_mapper.py`)
 - Maps heterogeneous room numbers and building strings to canonical campus nodes (`EB1`, `EB2`, `TB`, `IM`).
@@ -301,9 +305,13 @@ flowchart TD
 The A* search algorithm computes the optimal walking path and distance between campus buildings:
 - **Evaluation Function:** $f(n) = g(n) + h(n)$
   - $g(n)$: Exact accumulated walking distance from starting building to node $n$.
-  - $h(n)$: Admissible heuristic $h(n) = 5 \times \text{min\_hops}(n, \text{goal})$, guaranteeing that $h(n) \le h^*(n)$ for all pairs.
+  - $h(n)$: Admissible heuristic $h(n) = 5 \times \text{min\textunderscore hops}(n, \text{goal})$, guaranteeing that $h(n) \le h^\ast(n)$ for all pairs.
 - **Consistency (Monotonicity):** For any edge $(u, v)$ with weight $w(u, v)$:
-  $$h(u) \le w(u, v) + h(v)$$
+
+  $$
+  h(u) \le w(u, v) + h(v)
+  $$
+
   Ensuring no re-expansion of previously closed nodes.
 - **Priority Queue:** Implemented via Python's `heapq` with entry tuple `(f_score, g_score, current_node, path)`.
 
